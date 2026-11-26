@@ -1,0 +1,70 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-release'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate release tag and package version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "${TAG}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-release$ ]]; then
+            echo "::error title=Invalid release tag::Tag '${TAG}' must match vX.X.X-release."
+            exit 1
+          fi
+          TAG_VERSION="${BASH_REMATCH[1]}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          if [[ "${TAG_VERSION}" != "${PKG_VERSION}" ]]; then
+            echo "::error file=package.json,title=Version mismatch::Tag '${TAG}' (version ${TAG_VERSION}) does not match package.json version '${PKG_VERSION}'."
+            exit 1
+          fi
+          if [[ "${PKG_NAME}" != @pi-kode/* ]]; then
+            echo "::error file=package.json,title=Invalid package scope::Package name '${PKG_NAME}' must be scoped under @pi-kode/."
+            exit 1
+          fi
+          echo "Validated ${PKG_NAME}@${PKG_VERSION} for tag ${TAG}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install --no-package-lock --ignore-scripts
+
+      - name: Run tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: npm-publish
+      url: https://www.npmjs.com/package/@pi-kode/tasks
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install --no-package-lock --ignore-scripts
+
+      - name: Publish to npm (@pi-kode)
+        run: npm publish --provenance --access public

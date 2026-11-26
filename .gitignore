@@ -1,0 +1,16 @@
+# OS metadata
+.DS_Store
+
+# Dependencies and generated output
+node_modules/
+/dist/
+/coverage/
+*.tsbuildinfo
+*.tgz
+npm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
